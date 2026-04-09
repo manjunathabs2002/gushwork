@@ -95,295 +95,56 @@ function initializeHeroSlider() {
 
 // ==================== Image Carousel Functionality ====================
 
-/**
- * State object to manage carousel
- * Tracks current position and total items
- */
-const carouselState = {
-  currentIndex: 0,
-  itemsPerView: 4,
-  totalItems: 0,
-  realTotal: 0,
-  cloneCount: 0,
-  autoPlayInterval: null,
-  isAutoPlaying: false,
-};
+function getCarouselStep(carouselTrack) {
+  const firstItem = carouselTrack.querySelector('.carousel-item');
+  if (!firstItem) return 0;
 
-/**
- * Initialize the image carousel with zoom on hover
- * Features:
- * - Smooth scrolling between items
- * - Interactive navigation buttons
- * - Pagination dots
- * - Zoom effect on hover
- * - Seamless infinite looping
- */
+  const itemWidth = firstItem.getBoundingClientRect().width;
+  const trackStyles = getComputedStyle(carouselTrack);
+  const gap = parseFloat(trackStyles.columnGap || trackStyles.gap || '0') || 0;
+
+  return itemWidth + gap;
+}
+
+function scrollCarousel(carouselTrack, direction) {
+  const step = getCarouselStep(carouselTrack);
+  if (!step) return;
+
+  const maxScrollLeft = Math.max(
+    0,
+    carouselTrack.scrollWidth - carouselTrack.clientWidth,
+  );
+  const atStart = carouselTrack.scrollLeft <= 2;
+  const atEnd = carouselTrack.scrollLeft >= maxScrollLeft - 2;
+
+  if (direction < 0 && atStart) {
+    carouselTrack.scrollTo({ left: maxScrollLeft, behavior: 'smooth' });
+    return;
+  }
+
+  if (direction > 0 && atEnd) {
+    carouselTrack.scrollTo({ left: 0, behavior: 'smooth' });
+    return;
+  }
+
+  carouselTrack.scrollBy({ left: direction * step, behavior: 'smooth' });
+}
+
 function initializeCarousel() {
   const carouselTrack = document.getElementById('carouselTrack');
   const prevBtn = document.getElementById('carouselPrev');
   const nextBtn = document.getElementById('carouselNext');
-  const dotsContainer = document.getElementById('carouselDots');
 
-  if (!carouselTrack || !prevBtn || !nextBtn || !dotsContainer) return;
+  if (!carouselTrack || !prevBtn || !nextBtn) return;
 
-  // Get the original carousel items (before cloning)
-  let originalItems = Array.from(
-    carouselTrack.querySelectorAll('.carousel-item:not(.clone)'),
-  );
-  carouselState.realTotal = originalItems.length;
-
-  // Update items per view based on screen size
-  updateCarouselItemsPerView();
-  carouselState.cloneCount = carouselState.itemsPerView;
-
-  // Clone items at start and end for infinite scroll
-  originalItems = Array.from(
-    carouselTrack.querySelectorAll('.carousel-item:not(.clone)'),
-  );
-  const lastItems = originalItems.slice(-carouselState.cloneCount);
-  const firstItems = originalItems.slice(0, carouselState.cloneCount);
-
-  // Prepend clones of last items
-  lastItems.reverse().forEach((item) => {
-    const clone = item.cloneNode(true);
-    clone.classList.add('clone');
-    carouselTrack.insertBefore(clone, carouselTrack.firstChild);
-  });
-
-  // Append clones of first items
-  firstItems.forEach((item) => {
-    const clone = item.cloneNode(true);
-    clone.classList.add('clone');
-    carouselTrack.appendChild(clone);
-  });
-
-  // Update total items count
-  const items = carouselTrack.querySelectorAll('.carousel-item');
-  carouselState.totalItems = items.length;
-  carouselState.currentIndex = carouselState.cloneCount;
-
-  // Create pagination dots
-  createCarouselDots(dotsContainer);
-
-  // Set up event listeners
   prevBtn.addEventListener('click', () => {
-    carouselState.currentIndex -= 1;
-    updateCarousel();
-    checkWrapAround();
-    resetAutoPlay();
+    scrollCarousel(carouselTrack, -1);
   });
 
   nextBtn.addEventListener('click', () => {
-    carouselState.currentIndex += 1;
-    updateCarousel();
-    checkWrapAround();
-    resetAutoPlay();
-  });
-
-  // Dot navigation
-  const dots = dotsContainer.querySelectorAll('.dot');
-  dots.forEach((dot, index) => {
-    dot.addEventListener('click', () => {
-      carouselState.currentIndex = carouselState.cloneCount + index;
-      updateCarousel();
-      resetAutoPlay();
-    });
-  });
-
-  // Add zoom effect
-  addCarouselZoomEffect(items);
-
-  // Handle window resize
-  window.addEventListener('resize', () => {
-    updateCarouselItemsPerView();
-    updateCarousel();
-  });
-
-  // Initial display
-  updateCarousel();
-  startAutoPlay();
-}
-
-function checkWrapAround() {
-  const carouselTrack = document.getElementById('carouselTrack');
-  const realStart = carouselState.cloneCount;
-  const realEnd = carouselState.cloneCount + carouselState.realTotal - 1;
-
-  setTimeout(() => {
-    if (carouselState.currentIndex > realEnd) {
-      carouselState.currentIndex = realStart;
-      carouselTrack.style.transition = 'none';
-      updateCarousel();
-      setTimeout(() => {
-        carouselTrack.style.transition = 'transform 0.4s ease-out';
-      }, 50);
-    } else if (carouselState.currentIndex < realStart) {
-      carouselState.currentIndex = realEnd;
-      carouselTrack.style.transition = 'none';
-      updateCarousel();
-      setTimeout(() => {
-        carouselTrack.style.transition = 'transform 0.4s ease-out';
-      }, 50);
-    }
-  }, 400);
-}
-
-/**
- * Update the number of items shown based on viewport width
- * Responsive breakpoints:
- * - Mobile: 1 item
- * - Tablet: 2 items
- * - Desktop: 4 items
- */
-function updateCarouselItemsPerView() {
-  const width = window.innerWidth;
-
-  if (width < 480) {
-    carouselState.itemsPerView = 1;
-  } else if (width < 768) {
-    carouselState.itemsPerView = 2;
-  } else if (width < 1100) {
-    carouselState.itemsPerView = 3;
-  } else if (width < 1400) {
-    carouselState.itemsPerView = 4;
-  } else {
-    carouselState.itemsPerView = 5;
-  }
-
-  const maxIndex = Math.max(
-    0,
-    carouselState.totalItems - carouselState.itemsPerView,
-  );
-  if (carouselState.currentIndex > maxIndex) {
-    carouselState.currentIndex = maxIndex;
-  }
-}
-
-/**
- * Create pagination dots dynamically
- * One dot per "page" of carousel items
- */
-function createCarouselDots(container) {
-  container.innerHTML = '';
-  const totalPages = Math.max(1, carouselState.realTotal);
-
-  for (let i = 0; i < totalPages; i++) {
-    const dot = document.createElement('div');
-    dot.className = 'dot';
-    if (i === 0) dot.classList.add('active');
-    container.appendChild(dot);
-  }
-}
-
-/**
- * Update carousel position and active states
- * Handles visual feedback and animation
- */
-function updateCarousel() {
-  const carouselTrack = document.getElementById('carouselTrack');
-  const items = carouselTrack.querySelectorAll('.carousel-item');
-  const dots = document.querySelectorAll('.dot');
-
-  if (!carouselTrack || items.length === 0) return;
-
-  // Calculate dimensions
-  const itemWidth = items[0].offsetWidth;
-  const trackStyle = getComputedStyle(carouselTrack);
-  const gap = parseInt(trackStyle.gap || '16', 10);
-  const scrollPosition = carouselState.currentIndex * (itemWidth + gap);
-
-  // Apply transform
-  carouselTrack.style.transform = `translateX(-${scrollPosition}px)`;
-
-  // Update active dot
-  if (dots.length > 0) {
-    const activeDotIndex = Math.max(
-      0,
-      Math.min(
-        carouselState.currentIndex - carouselState.cloneCount,
-        dots.length - 1,
-      ),
-    );
-    dots.forEach((dot, index) => {
-      dot.classList.toggle('active', index === activeDotIndex);
-    });
-  }
-}
-
-/**
- * Add zoom effect to carousel images on hover
- * Displays a magnifying glass icon and zoomed preview
- * Images scale up smoothly with overlay effect
- */
-function addCarouselZoomEffect(items) {
-  items.forEach((item) => {
-    const imageWrapper = item.querySelector('.carousel-image-wrapper');
-    const image = item.querySelector('.carousel-image');
-    const zoomOverlay = item.querySelector('.carousel-zoom');
-
-    if (!imageWrapper || !image || !zoomOverlay) return;
-
-    // Add hover effect
-    imageWrapper.addEventListener('mouseenter', () => {
-      // Image zoom is handled by CSS
-      image.style.transform = 'scale(1.15)';
-      zoomOverlay.style.opacity = '1';
-    });
-
-    imageWrapper.addEventListener('mouseleave', () => {
-      image.style.transform = 'scale(1)';
-      zoomOverlay.style.opacity = '0';
-    });
-
-    // Touch support for mobile devices
-    imageWrapper.addEventListener('touchstart', (e) => {
-      e.preventDefault();
-      imageWrapper.play?.();
-    });
+    scrollCarousel(carouselTrack, 1);
   });
 }
-
-/**
- * Reset autoplay timer
- * Useful when user manually navigates carousel
- */
-function resetAutoPlay() {
-  if (carouselState.autoPlayInterval) {
-    clearInterval(carouselState.autoPlayInterval);
-  }
-  startAutoPlay();
-}
-
-/**
- * Start automatic carousel navigation
- * Rotates through items every 5 seconds
- */
-function startAutoPlay() {
-  if (carouselState.autoPlayInterval) {
-    clearInterval(carouselState.autoPlayInterval);
-  }
-
-  carouselState.autoPlayInterval = setInterval(() => {
-    carouselState.currentIndex += 1;
-    updateCarousel();
-    checkWrapAround();
-  }, 4000); // Auto-advance every 4 seconds
-}
-
-/**
- * Fishnet image slider state and management
- */
-const fishnetState = {
-  currentIndex: 0,
-  images: [
-    'assets/FishNetManufacturing.png',
-    'assets/FishNetManufacturing.png',
-    'assets/FishNetManufacturing.png',
-    'assets/FishNetManufacturing.png',
-    'assets/FishNetManufacturing.png',
-  ],
-  autoPlayInterval: null,
-};
 
 /**
  * Manufacturing process stage state
@@ -556,107 +317,6 @@ function initializeManufacturingTabs() {
 }
 
 /**
- * Initialize fishnet image slider
- */
-function initializeFishnetSlider() {
-  const fishnetImage = document.getElementById('fishnetImage');
-  const prevBtn = document.getElementById('fishnetPrev');
-  const nextBtn = document.getElementById('fishnetNext');
-  const dotsContainer = document.getElementById('fishnetDots');
-
-  if (!fishnetImage || !prevBtn || !nextBtn || !dotsContainer) return;
-
-  // Create dots for pagination
-  createFishnetDots(dotsContainer);
-
-  // Set up arrow navigation
-  prevBtn.addEventListener('click', () => {
-    fishnetState.currentIndex =
-      (fishnetState.currentIndex - 1 + fishnetState.images.length) %
-      fishnetState.images.length;
-    updateFishnetSlider();
-    resetFishnetAutoPlay();
-  });
-
-  nextBtn.addEventListener('click', () => {
-    fishnetState.currentIndex =
-      (fishnetState.currentIndex + 1) % fishnetState.images.length;
-    updateFishnetSlider();
-    resetFishnetAutoPlay();
-  });
-
-  // Set up dot navigation
-  const dots = dotsContainer.querySelectorAll('.fishnet-dot');
-  dots.forEach((dot, index) => {
-    dot.addEventListener('click', () => {
-      fishnetState.currentIndex = index;
-      updateFishnetSlider();
-      resetFishnetAutoPlay();
-    });
-  });
-
-  // Initialize display
-  updateFishnetSlider();
-}
-
-/**
- * Create pagination dots for fishnet slider
- */
-function createFishnetDots(container) {
-  container.innerHTML = '';
-
-  fishnetState.images.forEach((_, index) => {
-    const dot = document.createElement('div');
-    dot.className = 'fishnet-dot';
-    if (index === 0) dot.classList.add('active');
-    container.appendChild(dot);
-  });
-}
-
-/**
- * Update fishnet slider display
- */
-function updateFishnetSlider() {
-  const fishnetImage = document.getElementById('fishnetImage');
-  const dots = document.querySelectorAll('.fishnet-dot');
-
-  if (!fishnetImage) return;
-
-  // Update image with fade effect
-  fishnetImage.style.opacity = '0.5';
-  setTimeout(() => {
-    fishnetImage.src = fishnetState.images[fishnetState.currentIndex];
-    fishnetImage.style.opacity = '1';
-  }, 150);
-
-  // Update active dot
-  dots.forEach((dot, index) => {
-    dot.classList.toggle('active', index === fishnetState.currentIndex);
-  });
-}
-
-/**
- * Reset fishnet autoplay
- */
-function resetFishnetAutoPlay() {
-  if (fishnetState.autoPlayInterval) {
-    clearInterval(fishnetState.autoPlayInterval);
-  }
-  startFishnetAutoPlay();
-}
-
-/**
- * Start automatic fishnet slider rotation
- */
-function startFishnetAutoPlay() {
-  fishnetState.autoPlayInterval = setInterval(() => {
-    fishnetState.currentIndex =
-      (fishnetState.currentIndex + 1) % fishnetState.images.length;
-    updateFishnetSlider();
-  }, 5000); // Rotate every 5 seconds
-}
-
-/**
  * Initialize mobile menu toggle
  * Shows/hides navigation on mobile devices
  */
@@ -812,9 +472,6 @@ function initializeAll() {
 
   // Carousel
   initializeCarousel();
-
-  // Fishnet slider
-  initializeFishnetSlider();
 
   // Manufacturing stage tabs
   initializeManufacturingTabs();
