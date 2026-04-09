@@ -909,12 +909,38 @@ a:hover {
   padding: 0 100px;
 }
 
+.carousel-header-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 40px;
+  margin-bottom: 56px;
+}
+
+.carousel-section .section-header {
+  flex: 1;
+  text-align: left;
+  margin-bottom: 0;
+}
+
+.carousel-section .section-header h2 {
+  color: #111827;
+  margin-bottom: 12px;
+}
+
+.carousel-section .section-header p {
+  color: #4b5563;
+}
+
+.carousel-controls {
+  display: flex;
+  gap: 16px;
+  flex-wrap: nowrap;
+  flex-shrink: 0;
+}
+
 .carousel-container {
   width: 100%;
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 16px;
 }
 
 .carousel-track {
